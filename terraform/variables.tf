@@ -14,3 +14,9 @@ variable "unique_suffix" {
   description = "Unique suffix to avoid S3 bucket name collisions globally"
   type        = string
 }
+
+variable "api_secret" {
+  description = "Shared secret required to call the api_handler Lambda"
+  type        = string
+  sensitive   = true
+}

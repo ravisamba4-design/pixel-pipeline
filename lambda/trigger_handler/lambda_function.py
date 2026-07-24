@@ -1,15 +1,14 @@
 import json
 import boto3
 import uuid
+import os
 from datetime import datetime, timezone
+from urllib.parse import unquote_plus
 
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
 
 TABLE_NAME = 'pixel-pipeline-jobs'
-QUEUE_URL = None  # will be set via environment variable
-
-import os
 QUEUE_URL = os.environ.get('QUEUE_URL')
 
 table = dynamodb.Table(TABLE_NAME)
@@ -19,7 +18,7 @@ def lambda_handler(event, context):
     # S3 event notifications can contain multiple records in one event
     for record in event.get('Records', []):
         bucket_name = record['s3']['bucket']['name']
-        object_key = record['s3']['object']['key']
+        object_key = unquote_plus(record['s3']['object']['key'])
 
         job_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()

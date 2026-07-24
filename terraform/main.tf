@@ -31,6 +31,17 @@ resource "aws_s3_bucket" "uploads" {
   bucket = "${var.project_name}-uploads-${var.unique_suffix}"
 }
 
+resource "aws_s3_bucket_cors_configuration" "uploads_cors" {
+  bucket = aws_s3_bucket.uploads.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "POST", "GET"]
+    allowed_origins = ["*"]
+    max_age_seconds = 3000
+  }
+}
+
 resource "aws_s3_bucket" "processed" {
   bucket = "${var.project_name}-processed-${var.unique_suffix}"
 }
@@ -63,6 +74,12 @@ data "archive_file" "processor_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../lambda/processor"
   output_path = "${path.module}/processor.zip"
+}
+
+data "archive_file" "api_handler_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../lambda/api_handler"
+  output_path = "${path.module}/api_handler.zip"
 }
 
 # ---------- IAM role for trigger_handler Lambda ----------
@@ -165,6 +182,49 @@ resource "aws_iam_role_policy" "processor_policy" {
   })
 }
 
+# ---------- IAM role for api_handler Lambda ----------
+
+resource "aws_iam_role" "api_handler_role" {
+  name = "${var.project_name}-api-handler-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "api_handler_policy" {
+  name = "${var.project_name}-api-handler-policy"
+  role = aws_iam_role.api_handler_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
+        Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "${aws_s3_bucket.uploads.arn}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:Scan"]
+        Resource = aws_dynamodb_table.jobs.arn
+      }
+    ]
+  })
+}
+
 # ---------- Lambda functions ----------
 
 resource "aws_lambda_function" "trigger_handler" {
@@ -202,6 +262,49 @@ resource "aws_lambda_function" "processor" {
   }
 }
 
+resource "aws_lambda_function" "api_handler" {
+  function_name    = "${var.project_name}-api-handler"
+  filename         = data.archive_file.api_handler_zip.output_path
+  source_code_hash = data.archive_file.api_handler_zip.output_base64sha256
+  handler          = "lambda_function.lambda_handler"
+  runtime          = "python3.12"
+  role             = aws_iam_role.api_handler_role.arn
+  timeout          = 15
+
+  environment {
+    variables = {
+      UPLOADS_BUCKET = aws_s3_bucket.uploads.bucket
+      API_SECRET     = var.api_secret
+    }
+  }
+}
+
+resource "aws_lambda_function_url" "api_handler_url" {
+  function_name      = aws_lambda_function.api_handler.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_origins = ["*"]
+    allow_methods = ["POST"]
+    allow_headers = ["Content-Type", "X-Api-Key"]
+  }
+}
+
+resource "aws_lambda_permission" "allow_public_url_invoke" {
+  statement_id           = "AllowPublicInvokeFunctionUrl"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.api_handler.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
+
+resource "aws_lambda_permission" "allow_public_invoke_function" {
+  statement_id  = "AllowPublicInvokeFunction"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api_handler.function_name
+  principal     = "*"
+}
+
 # ---------- Wire up S3 -> trigger_handler ----------
 
 resource "aws_lambda_permission" "allow_s3_invoke" {
@@ -229,4 +332,10 @@ resource "aws_lambda_event_source_mapping" "sqs_to_processor" {
   event_source_arn = aws_sqs_queue.image_jobs.arn
   function_name    = aws_lambda_function.processor.arn
   batch_size       = 1
+}
+
+# ---------- Outputs ----------
+
+output "api_handler_url" {
+  value = aws_lambda_function_url.api_handler_url.function_url
 }

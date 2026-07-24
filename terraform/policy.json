@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:CreateBucket","s3:DeleteBucket","s3:PutBucketNotification","s3:GetBucketNotification"],
+      "Resource": "arn:aws:s3:::pixel-pipeline-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["sqs:CreateQueue","sqs:DeleteQueue","sqs:GetQueueAttributes","sqs:SetQueueAttributes","sqs:TagQueue"],
+      "Resource": "arn:aws:sqs:eu-north-1:053524633959:pixel-pipeline-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["dynamodb:CreateTable","dynamodb:DeleteTable","dynamodb:DescribeTable","dynamodb:TagResource"],
+      "Resource": "arn:aws:dynamodb:eu-north-1:053524633959:table/pixel-pipeline-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["lambda:CreateFunction","lambda:DeleteFunction","lambda:GetFunction","lambda:UpdateFunctionCode","lambda:UpdateFunctionConfiguration","lambda:AddPermission","lambda:RemovePermission","lambda:CreateEventSourceMapping","lambda:DeleteEventSourceMapping","lambda:GetEventSourceMapping","lambda:ListEventSourceMappings","lambda:TagResource","lambda:CreateFunctionUrlConfig","lambda:DeleteFunctionUrlConfig","lambda:GetFunctionUrlConfig","lambda:UpdateFunctionUrlConfig"],
+      "Resource": "arn:aws:lambda:eu-north-1:053524633959:function:pixel-pipeline-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["lambda:CreateEventSourceMapping","lambda:DeleteEventSourceMapping","lambda:GetEventSourceMapping","lambda:ListEventSourceMappings","lambda:UpdateEventSourceMapping"],
+      "Resource": "arn:aws:lambda:eu-north-1:053524633959:event-source-mapping:*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["iam:CreateRole","iam:DeleteRole","iam:GetRole","iam:PassRole","iam:PutRolePolicy","iam:DeleteRolePolicy","iam:GetRolePolicy","iam:AttachRolePolicy","iam:DetachRolePolicy","iam:TagRole"],
+      "Resource": "arn:aws:iam::053524633959:role/pixel-pipeline-*"
+    }
+  ]
+}
